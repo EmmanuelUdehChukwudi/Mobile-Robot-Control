@@ -1,4 +1,5 @@
 
+#include <math.h>
 #define LEFT_ENCODER_A 23
 #define LEFT_ENCODER_B 22
 #define RIGHT_ENCODER_A 21
@@ -15,15 +16,33 @@
 float wheel_diameter = 8.4; // centimeters
 
 long int left_count = 0;
+long int left_count_spd = 0;
 long int right_count = 0;
+long int right_count_spd = 0;
+
 
 int left_encoder_CPR = 207;
 int right_encoder_CPR = 207;
+int desired_count = 3;
+
+
+// Odometry variables
+long int del_right_count = 0;
+long int last_right_count = 0;
+long int del_left_count = 0;
+long int last_left_count = 0;
+float wheel_seperation = 0.316; // centimeters
+float left_wheel_distance = 0;
+float right_wheel_distance = 0;
+float robot_distance = 0;
+float x = 0;
+float y = 0;
+float phi = 0;
 
 volatile unsigned current_time = 0;
 volatile unsigned previous_time = 0;
 volatile unsigned delta_time = 0;
-volatile unsigned sample_time = 100; /// in milliseconds
+volatile unsigned sample_time = 10; /// in milliseconds
 
 volatile unsigned L_enc_cur_time = 0;
 volatile unsigned L_enc_prev_time = 0;
@@ -77,65 +96,112 @@ void setup() {
 }
 
 void loop() {
+  current_time = millis();
   R_enc_cur_time = millis();
   L_enc_cur_time = millis();
+  delta_time = current_time - previous_time;
 
+  if(delta_time >= sample_time)
+  {
+    R_enc_del_time = R_enc_cur_time - R_enc_prev_time;
+    L_enc_del_time = L_enc_cur_time - L_enc_prev_time;
+    // compute wheel velocities
+    Wl = desired_count*(2 * PI * freq_l)/ left_encoder_CPR;
+    Vl = Wl * wheel_diameter/2;
+    Wr = desired_count*(2 * PI * freq_r)/ right_encoder_CPR;
+    Vr = Wr * wheel_diameter/2;
+    MoveMotor_R(100,1);
+    MoveMotor_L(100,1);
+    
+    Odometry();
+    
+//    sendFilteredVelocity();
+    SendOdometry();
+    previous_time = current_time;
+  }
+  
+}
+
+void sendFilteredVelocity()
+{
   double filteredVl = movingAverageFilter(Vl, leftVelocities, leftIndex, leftVelocitySum);
   double filteredVr = movingAverageFilter(Vr, rightVelocities, rightIndex, rightVelocitySum);
-
   Serial.print(filteredVr);
   Serial.print(",");
-  Serial.print(filteredVl);
-  Serial.print(",");
+  Serial.println(filteredVl);
+}
+void sendRawVelocity()
+{
   Serial.print(Vr);
   Serial.print(",");
   Serial.println(Vl);
-  MoveMotor_R(100,1);
-  MoveMotor_L(100,1);
 }
 
 void do_left_motor()
 {
-  L_enc_del_time = L_enc_cur_time - L_enc_prev_time;
-  L_enc_prev_time = L_enc_cur_time;
-//  int b = digitalRead(LEFT_ENCODER_B);
-//  if(b > 0)
-//  {
-//    left_count--;
-//  }
-//  else
-//  {
-//    left_count++;
-//  }
-  if(L_enc_del_time)
+  int b = digitalRead(LEFT_ENCODER_B);
+  if(b > 0)
   {
-    freq_l = (1000)/(double) L_enc_del_time;
-    Wl = (2 * PI * freq_l)/ left_encoder_CPR;
-    Vl = Wl * wheel_diameter/2;
+    left_count--;
+    left_count_spd--;
+    if(abs(left_count_spd) == desired_count)
+    {
+         if(L_enc_del_time>0)
+        {
+          freq_l = (1000)/(double) L_enc_del_time;
+        }
+      left_count_spd = 0;
+      L_enc_prev_time = L_enc_cur_time;
+    }
+  }
+  else
+  {
+    left_count++;
+    left_count_spd++;
+    if(abs(left_count_spd) == desired_count)
+    {
+         if(L_enc_del_time>0)
+        {
+          freq_l = (1000)/(double) L_enc_del_time;
+        }
+      left_count_spd = 0;
+      L_enc_prev_time = L_enc_cur_time;
+    }
   }
 }
 
 void do_right_motor()
 {
-  R_enc_del_time = R_enc_cur_time - R_enc_prev_time;
-  R_enc_prev_time = R_enc_cur_time;
-//  int b = digitalRead(RIGHT_ENCODER_B);
-//  if(b > 0)
-//  {
-//    right_count++;
-//  }
-//  else
-//  {
-//    right_count--;
-//  }
-
-  if(R_enc_del_time>0)
+  int b = digitalRead(RIGHT_ENCODER_B);
+  if(b > 0)
   {
-    freq_r = (1000)/(double) R_enc_del_time;
-    Wr = (2 * PI * freq_r)/ right_encoder_CPR;
-    Vr = Wr * wheel_diameter/2;
+    right_count++;
+    right_count_spd++;
+    if(abs(right_count_spd) == desired_count)
+    {
+         if(R_enc_del_time>0)
+        {
+          freq_r = (1000)/(double) R_enc_del_time;
+        }
+      right_count_spd = 0;
+      R_enc_prev_time = R_enc_cur_time;
+    }
   }
-  
+  else
+  {
+    right_count--;
+    right_count_spd--;
+    if(abs(right_count_spd) == desired_count)
+    {
+         if(R_enc_del_time>0)
+        {
+          freq_r = (1000)/(double) R_enc_del_time;
+        }
+      right_count_spd = 0;
+      R_enc_prev_time = R_enc_cur_time;
+    }
+  }
+ 
 }
 
 void MoveMotor_L(int speed, int dir) {
@@ -173,4 +239,30 @@ double movingAverageFilter(double newValue, double* values, int& currentIndex, d
   currentIndex = (currentIndex + 1) % filterSize;
   double average = runningSum / filterSize;
   return average;
+}
+
+void Odometry()
+{
+  del_right_count =  right_count - last_right_count;
+  del_left_count =  left_count - last_left_count;
+  right_wheel_distance = (del_right_count * PI * wheel_diameter)/(double)right_encoder_CPR;
+  left_wheel_distance = (del_left_count * PI * wheel_diameter)/(double)left_encoder_CPR;
+
+  robot_distance = (right_wheel_distance + left_wheel_distance)/2;
+
+  x = x + robot_distance*cos(phi);
+  y = y + robot_distance*sin(phi);
+
+  phi = phi + (right_wheel_distance - left_wheel_distance)/wheel_seperation;
+  phi = atan2(sin(phi),cos(phi));  // keep phi between pi and -pi 
+
+  last_right_count = right_count;
+  last_left_count = left_count;
+}
+
+void SendOdometry()
+{
+  Serial.print(x);
+  Serial.print(",");
+  Serial.println(y);
 }
