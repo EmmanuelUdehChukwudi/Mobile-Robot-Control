@@ -37,6 +37,19 @@ float x = 0;
 float y = 0;
 float phi = 0;
 
+// controller parameters
+float set_x = 0;
+float set_y = 100;
+float distance_tolerance = 5.00 ;
+float V = 0;
+float W = 0; 
+float error = 0;
+float kp = 10;
+int PWML = 0;
+int PWMR = 0;
+int MAXPWM = 180;
+int MINPWM = 0;
+
 volatile unsigned current_time = 0;
 volatile unsigned previous_time = 0;
 volatile unsigned delta_time = 0;
@@ -100,6 +113,8 @@ void loop() {
   delta_time = current_time - previous_time;
 
   if (delta_time >= sample_time) {
+
+    float set_phi = atan2(set_y-y,set_x-x);
     R_enc_del_time = R_enc_cur_time - R_enc_prev_time;
     L_enc_del_time = L_enc_cur_time - L_enc_prev_time;
 
@@ -108,12 +123,43 @@ void loop() {
     Vl = Wl * wheel_diameter / 2;
     Wr = desired_count * (2 * PI * freq_r) / right_encoder_CPR;
     Vr = Wr * wheel_diameter / 2;
+//    V = (Vl+Vr)/2.0; 
+    V = 200;
+    error = set_phi - phi;
+    W = (Vr-Vl)/wheel_seperation + kp*error;
+    PWMR = V + (W*wheel_seperation)/2;
+    PWML = V - (W*wheel_seperation)/2;
+    
+    if(PWMR>MAXPWM)
+    {
+      PWMR = MAXPWM;
+    }
+    if(PWMR<MINPWM)
+    {
+      PWMR = MINPWM;
+    }
+    if(PWML>MAXPWM)
+    {
+      PWML = MAXPWM;
+    }
+    if(PWML<MINPWM)
+    {
+      PWML = MINPWM;
+    }
 
-    MoveMotor_R(120, 1);
-    MoveMotor_L(120, 1);
+    if(abs(x-set_x) < distance_tolerance && abs(y-set_y) < distance_tolerance)
+    {
+      MoveMotor_R(0, 0);
+      MoveMotor_L(0, 0);
+    }
+    else
+    {
+      MoveMotor_R(PWMR, 1);
+      MoveMotor_L(PWML, 1);
+    }
 
     Odometry();
-    sendOdometry();
+    sendPositionError();
     previous_time = current_time;
   }
   
@@ -140,6 +186,12 @@ void sendOdometry() {
 //  Serial.println(y);
   Serial.print(",");
   Serial.println(phi);
+}
+
+void sendPositionError() {
+  Serial.print(x-set_x);
+  Serial.print(",");
+  Serial.println(y-set_y);
 }
 
 void do_left_motor() {
