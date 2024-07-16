@@ -23,13 +23,13 @@ def update(frame):
             ax.set_ylabel('X Position (cm)', fontsize=14)
             ax.legend(fontsize=6)
             ax.axis('equal')
-            ax.set_xlim(-500, 500)  
-            ax.set_ylim(-500, 500) 
+            ax.set_xlim(-1000, 1000)  
+            ax.set_ylim(-1000, 1000) 
             ax.grid(True, linestyle='--', linewidth=0.5, color='gray')
             
             
-            ax.set_xticks(range(-500, 501, 100))
-            ax.set_yticks(range(-500, 501, 100))
+            ax.set_xticks(range(-1000, 1001, 100))
+            ax.set_yticks(range(-1000, 1001, 100))
             ax.set_facecolor('lightyellow')  
 
         except ValueError:
