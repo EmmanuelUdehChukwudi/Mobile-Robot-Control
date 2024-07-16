@@ -12,24 +12,25 @@ def update(frame):
         line = ser.readline().decode('utf-8').strip()
         try:
             x, y, phi = map(float, line.split(','))
-            x_pos.append(x)
-            y_pos.append(-y)
-            
-            ax.clear()
-            ax.plot(y_pos, x_pos, 'bo-', label='Path')
-            ax.plot(y_pos[-1], x_pos[-1], 'ro', label='Current Position') 
-            ax.set_title('Robot Path')
-            ax.set_xlabel('Y Position (m)')
-            ax.set_ylabel('X Position (m)')
-            ax.legend()
+            print(x,y)
+            x_pos.append(x)  
+            y_pos.append(-y)  
+            ax.clear() 
+            ax.plot(y_pos, x_pos, 'bo-', markersize=1, label='Path')  
+            ax.plot(y_pos[-1], x_pos[-1], 'ro', markersize=6, label='Current Position') 
+            ax.set_title('Robot Path', fontsize=16, fontweight='bold')
+            ax.set_xlabel('Y Position (cm)', fontsize=14)
+            ax.set_ylabel('X Position (cm)', fontsize=14)
+            ax.legend(fontsize=6)
             ax.axis('equal')
+            ax.set_xlim(-500, 500)  
+            ax.set_ylim(-500, 500) 
+            ax.grid(True, linestyle='--', linewidth=0.5, color='gray')
             
-            ax.set_xlim(-10, 10)
-            ax.set_ylim(-10, 10)
             
-            ax.set_xticks(range(-10, 11))
-            ax.set_yticks(range(-10, 11))
-            ax.grid(True)
+            ax.set_xticks(range(-500, 501, 100))
+            ax.set_yticks(range(-500, 501, 100))
+            ax.set_facecolor('lightyellow')  
 
         except ValueError:
             print(f"Could not parse line: {line}")
@@ -37,7 +38,6 @@ def update(frame):
 fig, ax = plt.subplots()
 fig.suptitle('Odometry Data')
 
-ani = FuncAnimation(fig, update, interval=10)
-
+ani = FuncAnimation(fig, update, interval=5) 
 plt.show()
 ser.close()

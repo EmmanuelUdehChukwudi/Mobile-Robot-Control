@@ -112,9 +112,8 @@ void loop() {
   L_enc_cur_time = millis();
   delta_time = current_time - previous_time;
 
-  if (delta_time >= sample_time) {
-
-    float set_phi = atan2(set_y-y,set_x-x);
+  if (delta_time >= sample_time) 
+  {
     R_enc_del_time = R_enc_cur_time - R_enc_prev_time;
     L_enc_del_time = L_enc_cur_time - L_enc_prev_time;
 
@@ -123,43 +122,11 @@ void loop() {
     Vl = Wl * wheel_diameter / 2;
     Wr = desired_count * (2 * PI * freq_r) / right_encoder_CPR;
     Vr = Wr * wheel_diameter / 2;
-//    V = (Vl+Vr)/2.0; 
-    V = 200;
-    error = set_phi - phi;
-    W = (Vr-Vl)/wheel_seperation + kp*error;
-    PWMR = V + (W*wheel_seperation)/2;
-    PWML = V - (W*wheel_seperation)/2;
-    
-    if(PWMR>MAXPWM)
-    {
-      PWMR = MAXPWM;
-    }
-    if(PWMR<MINPWM)
-    {
-      PWMR = MINPWM;
-    }
-    if(PWML>MAXPWM)
-    {
-      PWML = MAXPWM;
-    }
-    if(PWML<MINPWM)
-    {
-      PWML = MINPWM;
-    }
-
-    if(abs(x-set_x) < distance_tolerance && abs(y-set_y) < distance_tolerance)
-    {
-      MoveMotor_R(0, 0);
-      MoveMotor_L(0, 0);
-    }
-    else
-    {
-      MoveMotor_R(PWMR, 1);
-      MoveMotor_L(PWML, 1);
-    }
 
     Odometry();
-    sendPositionError();
+    sendOdometry();
+    MoveMotor_R(100, 1);
+    MoveMotor_L(100, 1);
     previous_time = current_time;
   }
   
