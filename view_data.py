@@ -22,8 +22,6 @@ def update():
     robot_data['x'].append(x)
     robot_data['y'].append(y)
     robot_data['phi'].append(phi)
-
-    # Emit the new data to update the plot in real-time
     socketio.emit('update_plot', {'x': x, 'y': y, 'phi': phi})
 
     return jsonify({"status": "success"})

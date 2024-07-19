@@ -52,17 +52,17 @@ double output = 0;
 
 // orientation controller
 float Xd = 100;
-float Yd = 100;
-float Kp_phi = 25;
+float Yd = 200;
+float Kp_phi = 30;
 float Ki_phi = 0;
 float Kd_phi = 0.01;
 float error_phi = 0;
 float phi_d = 0;
 
 // velocity controller
-float Kp_v = 10;
+float Kp_v = 30;
 float Ki_v = 0;
-float Kd_v = 0;
+float Kd_v = 0.1;
 float error_vx = 0;
 float error_vy = 0;
 float error_v = 0;
@@ -79,16 +79,16 @@ volatile unsigned L_enc_prev_time = 0;
 volatile unsigned L_enc_del_time = 0;
 double freq_l = 0;
 double Wl = 0;
-double Vl = 0;
+int Vl = 0;
 
 volatile unsigned R_enc_cur_time = 0;
 volatile unsigned R_enc_prev_time = 0;
 volatile unsigned R_enc_del_time = 0;
 double freq_r = 0;
 double Wr = 0;
-double Vr = 0;
+int Vr = 0;
 
-const int filterSize = 20;
+const int filterSize = 5;
 double leftVelocities[filterSize];
 double rightVelocities[filterSize];
 int leftIndex = 0;
@@ -150,18 +150,18 @@ void loop() {
 //    Velocity controller
     error_vx = Xd - x;
     error_vy = Yd - y;
-//    error_v = sqrt( (error_vx)*(error_vx) + (error_vy)*(error_vy) );
-//    double v_out = Controller(error_v,Kp_v,Ki_v,Kd_v);
-//    v_out = constrain(v_out,-255,255);
-    double v_out = 255;
-    Vl = v_out - (W * wheel_separation)/2.0 ;
-    Vr = v_out + (W * wheel_separation)/2.0 ;
-    int Vl_out = Vl;
-    int Vr_out = Vr;
-//    Vr_out = constrain(Vr_out,-255,255);
-//    Vl_out = constrain(Vl_out,-255,255);
-    Vr_out = constrain(Vr_out,0,255);
-    Vl_out = constrain(Vl_out,0,255);
+    error_v = sqrt( (error_vx)*(error_vx) + (error_vy)*(error_vy) );
+    int v_out = Controller(error_v,Kp_v,Ki_v,Kd_v);
+    v_out = constrain(v_out,-180,180);
+
+    Vl = v_out - (W * wheel_separation)/2 ;
+    Vr = v_out + (W * wheel_separation)/2 ;
+
+    Vl = constrain(Vl,-180,180);
+    Vr = constrain(Vr,-180,180);
+//    Vl = movingAverageFilter(Vl, leftVelocities, leftIndex, leftVelocitySum);
+//    Vr = movingAverageFilter(Vr, rightVelocities, rightIndex, rightVelocitySum);
+
 
     if(error_vx <= goal_tolerance && error_vy <= goal_tolerance)
     {
@@ -169,6 +169,8 @@ void loop() {
           right_dir = 0;
           Vl = 0;
           Vr = 0;
+          freq_r = 0;
+          freq_l = 0;
           MoveMotor_L(Vl,left_dir);
           MoveMotor_R(Vr,right_dir);
     }
@@ -177,36 +179,16 @@ void loop() {
     {
           MoveMotor_L(Vl,left_dir);
           MoveMotor_R(Vr,right_dir);
-//         if(Vl < 0)
-//        {
-//          left_dir = -1;
-//          MoveMotor_L(abs(Vl),left_dir);
-//        }
-//        else
-//        {
-//          MoveMotor_L(abs(Vl),left_dir);
-//        }
-//        if(Vr < 0)
-//        {
-//          right_dir = -1;
-//          MoveMotor_R(abs(Vr),right_dir);
-//        }
-//        else
-//        {
-//          MoveMotor_R(abs(Vr),right_dir);
-//        }
     }
 
-//    Serial.print(Vl_out);
-//    Serial.print(",");
-//    Serial.println(Vr_out);
-//    Serial.print(",");
-//    Serial.print(error_vx);
-//    Serial.print(",");
-//    Serial.print(error_vy);
-//    Serial.print(",");
-//    Serial.println(phi);
-    SendPhiControllerOutput();
+    Serial.print(Vr);
+    Serial.print(",");
+    Serial.print(Vl);
+    Serial.print("-----   ");
+    Serial.print(x);
+    Serial.print(",");
+    Serial.println(y);
+//    sendOdometry();
     previous_time = current_time;
     
   }

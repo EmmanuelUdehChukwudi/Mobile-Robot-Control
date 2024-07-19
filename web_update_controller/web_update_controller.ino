@@ -86,14 +86,14 @@ volatile unsigned L_enc_prev_time = 0;
 volatile unsigned L_enc_del_time = 0;
 double freq_l = 0;
 double Wl = 0;
-double Vl = 0;
+int Vl = 0;
 
 volatile unsigned R_enc_cur_time = 0;
 volatile unsigned R_enc_prev_time = 0;
 volatile unsigned R_enc_del_time = 0;
 double freq_r = 0;
 double Wr = 0;
-double Vr = 0;
+int Vr = 0;
 
 const int filterSize = 20;
 double leftVelocities[filterSize];
@@ -143,8 +143,7 @@ void loop() {
   ArduinoOTA.handle();
   current_time = millis();
   delta_time = current_time - previous_time;
-
-  if (delta_time >= sample_time) 
+   if (delta_time >= sample_time) 
   {
     phi_d = atan2(Yd - y, Xd - x);
     R_enc_del_time = millis() - R_enc_prev_time;
@@ -221,11 +220,11 @@ void loop() {
 //    Serial.print(error_vy);
 //    Serial.print(",");
 //    Serial.println(phi);
-    SendPhiControllerOutput();
-    sendToFlaskServer();
+    sendOdometry();
     previous_time = current_time;
     
   }
+  
 }
 
 void sendToFlaskServer() {
