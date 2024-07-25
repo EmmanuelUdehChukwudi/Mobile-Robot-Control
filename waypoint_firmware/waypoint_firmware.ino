@@ -2,12 +2,11 @@
 #include <MPU6050_tockn.h>
 #include <Wire.h>
 
-
 MPU6050 mpu6050(Wire);
 float orientation = 0;
 #define LEFT_ENCODER_A 23
-#define LEFT_ENCODER_B 17    //22
-#define RIGHT_ENCODER_A 16 //21
+#define LEFT_ENCODER_B 17
+#define RIGHT_ENCODER_A 16
 #define RIGHT_ENCODER_B 19
 
 #define R_speed_pin 27
@@ -45,7 +44,7 @@ float phi = 0;
 // controller parameters
 float set_x = 0;
 float set_y = 100;
-float goal_tolerance = 5.00;
+float goal_tolerance = 20.00;
 float V = 0;
 float W = 0; 
 float error_V = 0;
@@ -58,7 +57,7 @@ double output = 0;
 // orientation controller
 float Xd = 100;
 float Yd = -200;
-float Kp_phi = 30;
+float Kp_phi = 40;
 float Ki_phi = 0;
 float Kd_phi = 0.01;
 float error_phi = 0;
@@ -101,6 +100,14 @@ int rightIndex = 0;
 double leftVelocitySum = 0;
 double rightVelocitySum = 0;
 
+// Target positions
+const int numPositions = 2;
+float targetPositions[numPositions][2] = {
+  {0, 300},
+  {100, 100}
+};
+int currentPositionIndex = 0;
+
 void setup() {
   Serial.begin(115200);
 
@@ -140,6 +147,11 @@ void loop() {
 
   if (delta_time >= sample_time) 
   {
+    if(currentPositionIndex < numPositions) {
+      Xd = targetPositions[currentPositionIndex][0];
+      Yd = targetPositions[currentPositionIndex][1];
+    }
+    
     phi_d = atan2(Yd - y, Xd - x);
     R_enc_del_time = millis() - R_enc_prev_time;
     L_enc_del_time = millis() - L_enc_prev_time;
@@ -151,45 +163,40 @@ void loop() {
     Vr = Wr * (wheel_diameter) / 2;
     
     Odometry(); 
-//    angular velocity controller
-//    error_phi = phi_d - phi;
-    orientation = mpu6050.getAngleZ()*PI/180;
+    // Angular velocity controller
+    orientation = mpu6050.getAngleZ() * PI / 180;
     error_phi = phi_d - orientation;
     double phi_output = Controller(error_phi, Kp_phi, Ki_phi, Kd_phi);
-    W = phi_output; // robots angular velovity as computed by controller
+    W = phi_output; // robots angular velocity as computed by controller
 
-//    Velocity controller
+    // Velocity controller
     error_vx = Xd - x;
     error_vy = Yd - y;
-    error_v = sqrt( (error_vx)*(error_vx) + (error_vy)*(error_vy) );
-    int v_out = Controller(error_v,Kp_v,Ki_v,Kd_v);
-    v_out = constrain(v_out,-180,180);
+    error_v = sqrt((error_vx) * (error_vx) + (error_vy) * (error_vy));
+    int v_out = Controller(error_v, Kp_v, Ki_v, Kd_v);
+    v_out = constrain(v_out, -180, 180);
 
-    Vl = v_out - (W * wheel_separation)/2 ;
-    Vr = v_out + (W * wheel_separation)/2 ;
+    Vl = v_out - (W * wheel_separation) / 2;
+    Vr = v_out + (W * wheel_separation) / 2;
 
-    Vl = constrain(Vl,-180,180);
-    Vr = constrain(Vr,-180,180);
-//    Vl = movingAverageFilter(Vl, leftVelocities, leftIndex, leftVelocitySum);
-//    Vr = movingAverageFilter(Vr, rightVelocities, rightIndex, rightVelocitySum);
+    Vl = constrain(Vl, -180, 180);
+    Vr = constrain(Vr, -180, 180);
 
-
-    if(error_vx <= goal_tolerance && error_vy <= goal_tolerance)
-    {
-          left_dir = 0;
-          right_dir = 0;
-          Vl = 0;
-          Vr = 0;
-          freq_r = 0;
-          freq_l = 0;
-          MoveMotor_L(Vl,left_dir);
-          MoveMotor_R(Vr,right_dir);
-    }
-
-    else
-    {
-          MoveMotor_L(Vl,left_dir);
-          MoveMotor_R(Vr,right_dir);
+    if (error_v <= goal_tolerance) {
+      left_dir = 0;
+      right_dir = 0;
+      Vl = 0;
+      Vr = 0;
+      freq_r = 0;
+      freq_l = 0;
+      Serial.println("Reached target position. Moving to next target.");
+      MoveMotor_L(Vl, left_dir);
+      MoveMotor_R(Vr, right_dir);
+      delay(2000);
+      currentPositionIndex++;
+    } else {
+      MoveMotor_L(Vl, left_dir);
+      MoveMotor_R(Vr, right_dir);
     }
 
     Serial.print(Vr);
@@ -200,14 +207,11 @@ void loop() {
     Serial.print(",");
     Serial.println(y);
     sendOdometry();
-//    Serial.println(orientation);
     previous_time = current_time;
-    
   }
 }
 
-double Controller(float error, float Kp, float Ki, float Kd)
-{
+double Controller(float error, float Kp, float Ki, float Kd) {
   proportional_term = Kp * error;
   integral_term += Ki * error * (sample_time / 1000.0);
   derivative_term = Kd * (error - previous_error) / (sample_time / 1000.0);
@@ -215,8 +219,8 @@ double Controller(float error, float Kp, float Ki, float Kd)
   previous_error = error;
   return output;
 }
-void SendPhiControllerOutput()
-{
+
+void SendPhiControllerOutput() {
     Serial.print(phi_d);
     Serial.print(",");
     Serial.print(phi);
@@ -327,8 +331,8 @@ double movingAverageFilter(double newValue, double* values, int& currentIndex, d
 void Odometry() {
   del_right_count = right_count - last_right_count;
   del_left_count = left_count - last_left_count;
-  right_wheel_distance = (del_right_count * PI * (wheel_diameter )) / right_encoder_CPR;
-  left_wheel_distance = (del_left_count * PI * (wheel_diameter )) / left_encoder_CPR;
+  right_wheel_distance = (del_right_count * PI * (wheel_diameter)) / right_encoder_CPR;
+  left_wheel_distance = (del_left_count * PI * (wheel_diameter)) / left_encoder_CPR;
 
   robot_distance = (right_wheel_distance + left_wheel_distance) / 2;
 
