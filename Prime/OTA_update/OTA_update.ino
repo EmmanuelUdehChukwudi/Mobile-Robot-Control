@@ -1,7 +1,13 @@
+#include <ArduinoOTA.h>
 #include <math.h>
+#include <MPU6050_tockn.h>
+#include <Wire.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <ArduinoOTA.h>
+#include <ArduinoJson.h> 
+
+MPU6050 mpu6050(Wire);
+float orientation = 0;
 
 #define LEFT_ENCODER_A 23
 #define LEFT_ENCODER_B 17
@@ -20,7 +26,7 @@ float wheel_diameter = 8.4; // cm
 
 const char* ssid = "Emmanuel prime";
 const char* password = "55105322G";
-const char* serverName = "http://192.168.43.165:5000/update";
+const char* serverName = "http://192.168.43.165:5000/update"; 
 
 volatile long int left_count = 0;
 volatile long int left_count_spd = 0;
@@ -44,10 +50,10 @@ float x = 0;
 float y = 0;
 float phi = 0;
 
-// controller parameters
+// Controller parameters
 float set_x = 0;
 float set_y = 100;
-float goal_tolerance = 5.00;
+float goal_tolerance = 20.00;
 float V = 0;
 float W = 0; 
 float error_V = 0;
@@ -57,17 +63,17 @@ double integral_term = 0;
 double derivative_term = 0;
 double output = 0;
 
-// orientation controller
+// Orientation controller parameters
 float Xd = 0;
-float Yd = 100;
-float Kp_phi = 120;
+float Yd = 0;
+float Kp_phi = 80;
 float Ki_phi = 0;
-float Kd_phi = 0.01;
+float Kd_phi = 0.5;
 float error_phi = 0;
 float phi_d = 0;
 
-// velocity controller
-float Kp_v = 10;
+// Velocity controller parameters
+float Kp_v = 70;
 float Ki_v = 0;
 float Kd_v = 0;
 float error_vx = 0;
@@ -95,13 +101,21 @@ double freq_r = 0;
 double Wr = 0;
 int Vr = 0;
 
-const int filterSize = 20;
+const int filterSize = 5;
 double leftVelocities[filterSize];
 double rightVelocities[filterSize];
 int leftIndex = 0;
 int rightIndex = 0;
 double leftVelocitySum = 0;
 double rightVelocitySum = 0;
+
+// Target positions
+const int numPositions = 2;
+float targetPositions[numPositions][2] = {
+  {0, 300},
+  {0, 0}
+};
+int currentPositionIndex = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -129,6 +143,10 @@ void setup() {
     rightVelocities[i] = 0;
   }
 
+  Wire.begin();
+  mpu6050.begin();
+  mpu6050.calcGyroOffsets(true);
+  
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -136,103 +154,71 @@ void setup() {
   }
   Serial.println("Connected to WiFi");
   ArduinoOTA.begin();
-  delay(1000); 
+  delay(2000); 
 }
 
 void loop() {
   ArduinoOTA.handle();
-//  current_time = millis();
-//  delta_time = current_time - previous_time;
-//   if (delta_time >= sample_time) 
-//  {
-//    phi_d = atan2(Yd - y, Xd - x);
-//    R_enc_del_time = millis() - R_enc_prev_time;
-//    L_enc_del_time = millis() - L_enc_prev_time;
-//
-//    // Compute wheel velocities
-//    Wl = desired_count * (2 * PI * freq_l) / left_encoder_CPR;
-//    Vl = Wl * (wheel_diameter) / 2;
-//    Wr = desired_count * (2 * PI * freq_r) / right_encoder_CPR;
-//    Vr = Wr * (wheel_diameter) / 2;
-//    
-//    Odometry(); 
-////    angular velocity controller
-//    error_phi = phi_d - phi;
-//    double phi_output = Controller(error_phi, Kp_phi, Ki_phi, Kd_phi);
-//    W = phi_output; // robots angular velovity as computed by controller
-//
-////    Velocity controller
-//    error_vx = Xd - x;
-//    error_vy = Yd - y;
-////    error_v = sqrt( (error_vx)*(error_vx) + (error_vy)*(error_vy) );
-////    double v_out = Controller(error_v,Kp_v,Ki_v,Kd_v);
-////    v_out = constrain(v_out,-255,255);
-//    double v_out = 255;
-//    Vl = v_out - (W * wheel_separation)/2.0 ;
-//    Vr = v_out + (W * wheel_separation)/2.0 ;
-//    int Vl_out = Vl;
-//    int Vr_out = Vr;
-////    Vr_out = constrain(Vr_out,-255,255);
-////    Vl_out = constrain(Vl_out,-255,255);
-//    Vr_out = constrain(Vr_out,0,255);
-//    Vl_out = constrain(Vl_out,0,255);
-//
-//    if(error_vx <= goal_tolerance && error_vy <= goal_tolerance)
-//    {
-//          left_dir = 0;
-//          right_dir = 0;
-//          Vl = 0;
-//          Vr = 0;
-//          MoveMotor_L(Vl,left_dir);
-//          MoveMotor_R(Vr,right_dir);
-//    }
-//
-//    else
-//    {
-//          MoveMotor_L(Vl,left_dir);
-//          MoveMotor_R(Vr,right_dir);
-////         if(Vl < 0)
-////        {
-////          left_dir = -1;
-////          MoveMotor_L(abs(Vl),left_dir);
-////        }
-////        else
-////        {
-////          MoveMotor_L(abs(Vl),left_dir);
-////        }
-////        if(Vr < 0)
-////        {
-////          right_dir = -1;
-////          MoveMotor_R(abs(Vr),right_dir);
-////        }
-////        else
-////        {
-////          MoveMotor_R(abs(Vr),right_dir);
-////        }
-//    }
-//
-////    Serial.print(Vl_out);
-////    Serial.print(",");
-////    Serial.println(Vr_out);
-////    Serial.print(",");
-////    Serial.print(error_vx);
-////    Serial.print(",");
-////    Serial.print(error_vy);
-////    Serial.print(",");
-////    Serial.println(phi);
-//    sendOdometry();
-//    previous_time = current_time;
-//    
-//  }
-  MoveMotor_L(255,1);
-  MoveMotor_R(255,1);
-  delay(3000);
-  MoveMotor_L(0,0);
-  MoveMotor_R(0,0);
-  delay(3000);
-  MoveMotor_L(255,-1);
-  MoveMotor_R(255,-1);
-  delay(3000);
+  mpu6050.update();
+  current_time = millis();
+  delta_time = current_time - previous_time;
+  
+  if (delta_time >= sample_time) {
+    if (currentPositionIndex < numPositions) {
+      Xd = targetPositions[currentPositionIndex][0];
+      Yd = targetPositions[currentPositionIndex][1];
+    }
+    
+    phi_d = atan2(Yd - y, Xd - x);
+    R_enc_del_time = millis() - R_enc_prev_time;
+    L_enc_del_time = millis() - L_enc_prev_time;
+
+    // Compute wheel velocities
+    Wl = desired_count * (2 * PI * freq_l) / left_encoder_CPR;
+    Vl = Wl * (wheel_diameter) / 2;
+    Wr = desired_count * (2 * PI * freq_r) / right_encoder_CPR;
+    Vr = Wr * (wheel_diameter) / 2;
+    
+    Odometry(); 
+    // Angular velocity controller
+    orientation = mpu6050.getAngleZ() * PI / 180;
+    error_phi = phi_d - orientation;
+    double phi_output = Controller(error_phi, Kp_phi, Ki_phi, Kd_phi);
+    W = phi_output; // Robot's angular velocity as computed by controller
+
+    // Velocity controller
+    error_vx = Xd - x;
+    error_vy = Yd - y;
+    error_v = sqrt((error_vx) * (error_vx) + (error_vy) * (error_vy));
+//    int v_out = 255;
+    int v_out = Controller(error_v, Kp_v, Ki_v, Kd_v);
+    Vl = v_out - (W * wheel_separation) / 2;
+    int phi_l = Vl / (wheel_diameter / 2);
+    Vr = v_out + (W * wheel_separation) / 2;
+    int phi_r = Vr / (wheel_diameter / 2);
+
+    Vl = constrain(Vl, 0, 255);
+    Vr = constrain(Vr, 0, 255);
+
+    if (error_v <= goal_tolerance) {
+      left_dir = 0;
+      right_dir = 0;
+      phi_l = 0;
+      phi_r = 0;
+      freq_r = 0;
+      freq_l = 0;
+      Serial.println("Reached target position. Moving to next target.");
+      MoveMotor_L(Vl, left_dir);
+      MoveMotor_R(Vr, right_dir);
+      delay(2000);
+      currentPositionIndex++;
+    } else {
+      MoveMotor_L(Vl, left_dir);
+      MoveMotor_R(Vr, right_dir);
+    }
+    
+    previous_time = current_time;
+  }
 }
 
 void sendToFlaskServer() {
@@ -259,8 +245,7 @@ void sendToFlaskServer() {
 }
 
 
-double Controller(float error, float Kp, float Ki, float Kd)
-{
+double Controller(float error, float Kp, float Ki, float Kd) {
   proportional_term = Kp * error;
   integral_term += Ki * error * (sample_time / 1000.0);
   derivative_term = Kd * (error - previous_error) / (sample_time / 1000.0);
@@ -268,8 +253,8 @@ double Controller(float error, float Kp, float Ki, float Kd)
   previous_error = error;
   return output;
 }
-void SendPhiControllerOutput()
-{
+
+void SendPhiControllerOutput() {
     Serial.print(phi_d);
     Serial.print(",");
     Serial.print(phi);
@@ -380,8 +365,8 @@ double movingAverageFilter(double newValue, double* values, int& currentIndex, d
 void Odometry() {
   del_right_count = right_count - last_right_count;
   del_left_count = left_count - last_left_count;
-  right_wheel_distance = (del_right_count * PI * (wheel_diameter )) / right_encoder_CPR;
-  left_wheel_distance = (del_left_count * PI * (wheel_diameter )) / left_encoder_CPR;
+  right_wheel_distance = (del_right_count * PI * (wheel_diameter)) / right_encoder_CPR;
+  left_wheel_distance = (del_left_count * PI * (wheel_diameter)) / left_encoder_CPR;
 
   robot_distance = (right_wheel_distance + left_wheel_distance) / 2;
 
@@ -389,8 +374,9 @@ void Odometry() {
   y += robot_distance * sin(phi);
 
   phi += (right_wheel_distance - left_wheel_distance) / wheel_separation;
-  phi = atan2(sin(phi), cos(phi)); // keep phi between pi and -pi 
-
+  phi = atan2(sin(phi), cos(phi)); 
   last_right_count = right_count;
   last_left_count = left_count;
+  sendOdometry();
+  sendToFlaskServer();
 }

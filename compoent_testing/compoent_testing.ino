@@ -31,8 +31,12 @@ void setup() {
 
 void loop() {
   mpu6050.update();
-  Serial.print("\tangleZ : ");
-  Serial.println(mpu6050.getAngleZ()*PI/180);
+  Serial.print("angleZ : ");
+  Serial.print(mpu6050.getAngleZ()*PI/180);
+  Serial.print("   Left Count: ");
+  Serial.print(left_count);
+  Serial.print("   Right Count: ");
+  Serial.println(right_count);
 }
 
 void do_left_motor() {

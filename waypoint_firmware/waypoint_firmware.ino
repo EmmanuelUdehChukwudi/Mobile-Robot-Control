@@ -56,17 +56,17 @@ double output = 0;
 
 // orientation controller
 float Xd = 100;
-float Yd = -200;
-float Kp_phi = 40;
+float Yd = 100;
+float Kp_phi = 120;
 float Ki_phi = 0;
-float Kd_phi = 0.01;
+float Kd_phi = 5;
 float error_phi = 0;
 float phi_d = 0;
 
 // velocity controller
-float Kp_v = 30;
+float Kp_v = 50;
 float Ki_v = 0;
-float Kd_v = 0.1;
+float Kd_v = 0;
 float error_vx = 0;
 float error_vy = 0;
 float error_v = 0;
@@ -104,7 +104,7 @@ double rightVelocitySum = 0;
 const int numPositions = 2;
 float targetPositions[numPositions][2] = {
   {0, 300},
-  {100, 100}
+  {0, 0}
 };
 int currentPositionIndex = 0;
 
@@ -173,42 +173,52 @@ void loop() {
     error_vx = Xd - x;
     error_vy = Yd - y;
     error_v = sqrt((error_vx) * (error_vx) + (error_vy) * (error_vy));
-    int v_out = Controller(error_v, Kp_v, Ki_v, Kd_v);
-    v_out = constrain(v_out, -180, 180);
+    int v_out = 255;
+//    float v_out = Controller(error_v, Kp_v, Ki_v, Kd_v);
+//    v_out = constrain(v_out, -255, 255);
 
     Vl = v_out - (W * wheel_separation) / 2;
+    int phi_l = Vl/(wheel_diameter/2);
     Vr = v_out + (W * wheel_separation) / 2;
+    int phi_r = Vr/(wheel_diameter/2);
 
-    Vl = constrain(Vl, -180, 180);
-    Vr = constrain(Vr, -180, 180);
+    phi_l = constrain(phi_l, 0, 255);
+    phi_r = constrain(phi_r, 0, 255);
 
     if (error_v <= goal_tolerance) {
       left_dir = 0;
       right_dir = 0;
-      Vl = 0;
-      Vr = 0;
+      phi_l = 0;
+      phi_r = 0;
       freq_r = 0;
       freq_l = 0;
       Serial.println("Reached target position. Moving to next target.");
-      MoveMotor_L(Vl, left_dir);
-      MoveMotor_R(Vr, right_dir);
+      MoveMotor_L(phi_l, left_dir);
+      MoveMotor_R(phi_r, right_dir);
       delay(2000);
       currentPositionIndex++;
     } else {
-      MoveMotor_L(Vl, left_dir);
-      MoveMotor_R(Vr, right_dir);
+      MoveMotor_L(phi_l, left_dir);
+      MoveMotor_R(phi_r, right_dir);
     }
 
-    Serial.print(Vr);
-    Serial.print(",");
-    Serial.print(Vl);
-    Serial.print("-----   ");
-    Serial.print(x);
-    Serial.print(",");
-    Serial.println(y);
-    sendOdometry();
+//    Serial.print(phi_l);
+//    Serial.print(",");
+//    Serial.print(phi_r);
+//    Serial.print("-----   ");
+//    Serial.print(x);
+//    Serial.print(",");
+//    Serial.println(y);
+      Serial.println(W);
+//    sendOdometry();
     previous_time = current_time;
   }
+  MoveMotor_L(180, 1);
+  MoveMotor_R(180, 1);
+  delay(2000);
+  MoveMotor_L(100, -1);
+  MoveMotor_R(100, -1);
+  delay(2000);
 }
 
 double Controller(float error, float Kp, float Ki, float Kd) {
@@ -344,4 +354,10 @@ void Odometry() {
 
   last_right_count = right_count;
   last_left_count = left_count;
+  Serial.print("Odometry Data - X: ");
+  Serial.print(x);
+  Serial.print(", Y: ");
+  Serial.print(y);
+  Serial.print(", Phi: ");
+  Serial.println(phi);
 }
