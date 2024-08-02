@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Data Display</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-top: 50px;
+        }
+        .data-card {
+            margin-top: 20px;
+        }
+        .data-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .data-value {
+            font-size: 2rem;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card data-card">
+                    <div class="card-body">
+                        <div class="data-title">X Position</div>
+                        <div id="x-value" class="data-value">{{ robot_data['x'] }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card data-card">
+                    <div class="card-body">
+                        <div class="data-title">Y Position</div>
+                        <div id="y-value" class="data-value">{{ robot_data['y'] }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card data-card">
+                    <div class="card-body">
+                        <div class="data-title">Orientation (Phi)</div>
+                        <div id="phi-value" class="data-value">{{ robot_data['phi'] }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var socket = io();
+
+            socket.on('update_data', function(data) {
+                $('#x-value').text(data.x);
+                $('#y-value').text(data.y);
+                $('#phi-value').text(data.phi);
+            });
+        });
+    </script>
+</body>
+</html>

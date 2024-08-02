@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Robot Position Plot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .chart-container {
+            flex: 2;
+            text-align: center;
+        }
+
+        canvas {
+            width: 100%;
+            max-width: 1000px;
+            height: auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .params-container {
+            flex: 1;
+            margin-left: 20px;
+        }
+
+        .param {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chart-container">
+            <h1>Robot Position Plot</h1>
+            <canvas id="positionChart"></canvas>
+        </div>
+        <div class="params-container">
+            <h2>Robot Parameters</h2>
+            <div class="param">X Position: <span id="xPosition">0</span></div>
+            <div class="param">Y Position: <span id="yPosition">0</span></div>
+            <div class="param">Phi: <span id="phi">0</span></div>
+            <h3>Send Position Command</h3>
+            <form id="commandForm">
+                <div class="mb-3">
+                    <label for="commandX" class="form-label">X Position:</label>
+                    <input type="number" class="form-control" id="commandX" required>
+                </div>
+                <div class="mb-3">
+                    <label for="commandY" class="form-label">Y Position:</label>
+                    <input type="number" class="form-control" id="commandY" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        var socket = io();
+
+        var ctx = document.getElementById('positionChart').getContext('2d');
+        var positionChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Path',
+                    borderColor: 'rgb(75, 192, 192)',
+                    fill: false,
+                    data: [],
+                    showLine: true,
+                    pointRadius: 1,
+                    borderWidth: 2
+                }, {
+                    label: 'Current Position',
+                    borderColor: 'rgb(255, 0, 0)',
+                    fill: false,
+                    data: [],
+                    showLine: false,
+                    pointRadius: 6
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'X Position (cm)'
+                        },
+                        min: -500,
+                        max: 500,
+                        ticks: {
+                            stepSize: 50
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)',
+                            borderDash: [2, 2],
+                            lineWidth: 1
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Y Position (cm)'
+                        },
+                        min: -500,
+                        max: 500,
+                        ticks: {
+                            stepSize: 50
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)',
+                            borderDash: [2, 2],
+                            lineWidth: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        function updateParameters(x, y, phi) {
+            document.getElementById('xPosition').innerText = x;
+            document.getElementById('yPosition').innerText = y;
+            document.getElementById('phi').innerText = phi;
+        }
+
+        socket.on('initial_data', function (data) {
+            data.x.forEach((x, index) => {
+                positionChart.data.datasets[0].data.push({ x: x, y: data.y[index] });
+            });
+            if (data.x.length > 0) {
+                const lastX = data.x[data.x.length - 1];
+                const lastY = data.y[data.y.length - 1];
+                const lastPhi = data.phi[data.phi.length - 1];
+                positionChart.data.datasets[1].data = [{ x: lastX, y: lastY }];
+                updateParameters(lastX, lastY, lastPhi);
+            }
+            positionChart.update();
+        });
+
+        socket.on('update_plot', function (data) {
+            positionChart.data.datasets[0].data.push({ x: data.x, y: data.y });
+            positionChart.data.datasets[1].data = [{ x: data.x, y: data.y }];
+            updateParameters(data.x, data.y, data.phi);
+            positionChart.update();
+        });
+
+        document.getElementById('commandForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const x = document.getElementById('commandX').value;
+            const y = document.getElementById('commandY').value;
+            fetch('/send_command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ x: x, y: y })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Command sent:', data);
+            });
+        });
+    </script>
+</body>
+</html>
